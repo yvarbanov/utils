@@ -11,4 +11,4 @@ RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/relea
 
 RUN oc version --client && virtctl --help
 
-ENTRYPOINT ["/bin/bash"]
+CMD ["/bin/bash"]
