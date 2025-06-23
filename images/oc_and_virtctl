@@ -9,7 +9,8 @@ ENV OC_VERSION=4.15.0 \
 
 # Download and install `oc`
 RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
-    tar -xz -C /usr/local/bin oc
+    tar -xz -C /tmp && \
+    mv /tmp/oc /usr/bin/oc && chmod +x /usr/bin/oc
 
 # Download and install `virtctl`
 RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/v${VIRTCTL_VERSION}/virtctl-v${VIRTCTL_VERSION}-linux-amd64 \
