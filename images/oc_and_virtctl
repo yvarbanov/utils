@@ -1,31 +1,55 @@
+# Use Fedora 40 as the base image
 FROM fedora:40
 
-# Set environment variables for tool versions
-ENV OC_VERSION=4.15.0 \
-    VIRTCTL_VERSION=v1.4.1
+# Set environment variables for tool versions to easily update them
+ENV OC_VERSION=4.15.18
+ENV VIRTCTL_VERSION=v1.2.0
+# It's good practice to also version jq
+ENV JQ_VERSION=1.7.1
 
-# Combine installation steps into a single RUN command to reduce image layers.
-RUN dnf install -y \
+# Label the image for maintainability
+LABEL maintainer="your-email@example.com" \
+      description="A Fedora-based image with OpenShift, Kubernetes, KubeVirt, and jq CLI tools." \
+      version="1.0"
+
+# --- Install all tools in a single RUN layer to minimize image size ---
+RUN \
+    # Step 1: Install initial dependencies from DNF
+    # jq is installed here directly from Fedora's repositories.
+    # We also need curl, tar for downloading/extracting, and ca-certificates for HTTPS validation.
+    dnf install -y \
+        jq \
         curl \
         tar \
-        ca-certificates \
-        jq && \
+        ca-certificates && \
     \
+    # Step 2: Install OpenShift Client (oc) and Kubernetes Client (kubectl)
+    # They are bundled together in the openshift-client archive.
     echo "--- Installing OpenShift Clients (oc and kubectl) v${OC_VERSION} ---" && \
-    curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
-    # THE FIX IS HERE: Removed 'oc' from the end of the tar command to extract all contents.
+    curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" | \
+    # Extract the archive directly into /usr/local/bin.
+    # --strip-components=1 removes the top-level directory from the tarball,
+    # placing oc and kubectl directly into the target directory.
     tar -xz -C /usr/local/bin --strip-components=1 && \
     \
+    # Step 3: Install KubeVirt Client (virtctl)
     echo "--- Installing virtctl ${VIRTCTL_VERSION} ---" && \
-    curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64 && \
+    curl -L -o /usr/local/bin/virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64" && \
+    # Make the downloaded binary executable
     chmod +x /usr/local/bin/virtctl && \
     \
+    # Step 4: Clean up the DNF cache to reduce final image size
     echo "--- Cleaning up DNF cache ---" && \
     dnf clean all
 
-# A separate, final RUN command to verify that all tools were installed correctly and are in the PATH.
-# Note: Since the corrected tar command extracts everything, we can now also verify kubectl.
-RUN oc version --client && kubectl version --client --short && virtctl version --client && jq --version
+# --- Verification Step ---
+# Run version checks in a separate layer. This helps with Docker layer caching.
+# If you only change a tool's version ENV, only the installation layer and this one will be re-run.
+RUN echo "--- Verifying installed tool versions ---" && \
+    oc version --client && \
+    kubectl version --client --short && \
+    virtctl version --client && \
+    jq --version
 
-# Set the default command to start a bash shell when the container runs.
+# Set the default command to start a bash shell when the container is run interactively
 CMD ["/bin/bash"]
