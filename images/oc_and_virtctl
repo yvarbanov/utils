@@ -1,17 +1,35 @@
 FROM fedora:40
 
+# Set environment variables for tool versions
 ENV OC_VERSION=4.15.0 \
     VIRTCTL_VERSION=v1.4.1
-    
-RUN dnf install -y curl tar ca-certificates && dnf clean all
 
-RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
-    tar -xz -C /usr/local/bin oc && \
-    chmod +x /usr/local/bin/oc
+# Combine installation steps into a single RUN command to reduce image layers.
+# This single layer will:
+# 1. Install all necessary packages from DNF, including jq.
+# 2. Download and correctly extract the 'oc' client.
+# 3. Download and set permissions for the 'virtctl' client.
+# 4. Clean up the DNF cache to keep the layer small.
+RUN dnf install -y \
+        curl \
+        tar \
+        ca-certificates \
+        jq && \
+    \
+    echo "--- Installing oc client v${OC_VERSION} ---" && \
+    curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
+    tar -xz -C /usr/local/bin --strip-components=1 oc && \
+    chmod +x /usr/local/bin/oc && \
+    \
+    echo "--- Installing virtctl ${VIRTCTL_VERSION} ---" && \
+    curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64 && \
+    chmod +x /usr/local/bin/virtctl && \
+    \
+    echo "--- Cleaning up DNF cache ---" && \
+    dnf clean all
 
-RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64 && \
-    chmod +x /usr/local/bin/virtctl
+# A separate, final RUN command to verify that all tools were installed correctly and are in the PATH.
+RUN oc version --client && virtctl version --client && jq --version
 
-RUN oc version --client && virtctl version -c
-
+# Set the default command to start a bash shell when the container runs.
 CMD ["/bin/bash"]
