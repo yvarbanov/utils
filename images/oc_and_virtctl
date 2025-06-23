@@ -1,17 +1,20 @@
 FROM fedora:40
 
-ENV OC_VERSION=4.15.0 \
+ENV OC_VERSION=4.16.0 \
     VIRTCTL_VERSION=v1.4.1
     
-RUN dnf install -y curl tar ca-certificates && dnf clean all
+RUN dnf install -y curl tar gzip jq ca-certificates && dnf clean all
 
 RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
-    tar -xz -C /usr/local/bin oc && \
-    chmod +x /usr/local/bin/oc
+    tar -xz -C /usr/local/bin oc kubectl && \
+    chmod +x /usr/local/bin/oc /usr/local/bin/kubectl
 
 RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64 && \
     chmod +x /usr/local/bin/virtctl
 
-RUN oc version --client && virtctl version -c
+RUN oc version --client && \
+    kubectl version -c && \
+    virtctl version -c && \
+    jq --version
 
 CMD ["/bin/bash"]
