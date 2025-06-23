@@ -1,55 +1,75 @@
-# Use Fedora 40 as the base image
-FROM fedora:40
+# ==============================================================================
+# Dockerfile to create an image with OpenShift, Kubernetes, and KubeVirt CLIs
+# Base Image: Red Hat Universal Base Image 8 (ubi8) - a solid, enterprise-grade base.
+# ==============================================================================
 
-# Set environment variables for tool versions to easily update them
-ENV OC_VERSION=4.15.18
-ENV VIRTCTL_VERSION=v1.2.0
-# It's good practice to also version jq
-ENV JQ_VERSION=1.7.1
+# Use a specific version for reproducibility
+FROM registry.access.redhat.com/ubi8/ubi:8.10
 
-# Label the image for maintainability
-LABEL maintainer="your-email@example.com" \
-      description="A Fedora-based image with OpenShift, Kubernetes, KubeVirt, and jq CLI tools." \
-      version="1.0"
+# ==============================================================================
+# METADATA
+# ==============================================================================
+LABEL maintainer="Your Name <youremail@example.com>" \
+      description="A development and management image with oc, kubectl, virtctl, and jq." \
+      version="1.1"
 
-# --- Install all tools in a single RUN layer to minimize image size ---
+# ==============================================================================
+# ARGUMENTS & ENVIRONMENT VARIABLES
+# Define tool versions and architecture. Using ARGs allows for easy updates at build time.
+# Example build command to override: docker build --build-arg KUBECTL_VERSION=1.29.0 -t my-tools .
+# ==============================================================================
+ARG OC_VERSION="4.15.13"
+ARG KUBECTL_VERSION="1.29.3"
+ARG KUBEVIRT_VERSION="v1.2.0"
+ARG TARGET_ARCH="amd64"
+
+# Set the PATH to ensure our installed binaries are found.
+# While /usr/local/bin is usually in the PATH by default, being explicit is good practice.
+ENV PATH="/usr/local/bin:${PATH}"
+
+# ==============================================================================
+# INSTALLATION
+# The main layer where we install all our tools.
+# ==============================================================================
 RUN \
-    # Step 1: Install initial dependencies from DNF
-    # jq is installed here directly from Fedora's repositories.
-    # We also need curl, tar for downloading/extracting, and ca-certificates for HTTPS validation.
-    dnf install -y \
-        jq \
-        curl \
-        tar \
-        ca-certificates && \
+    # --- 1. System Dependencies ---
+    # Update package lists and install necessary tools like curl, tar, and jq.
+    # Using 'dnf' as this is a RHEL-based image.
+    # The 'clean all' command reduces the final image size.
+    echo "--- Installing system dependencies (curl, tar, gzip, jq) ---" && \
+    dnf install -y curl tar gzip jq && \
+    dnf clean all && \
     \
-    # Step 2: Install OpenShift Client (oc) and Kubernetes Client (kubectl)
-    # They are bundled together in the openshift-client archive.
-    echo "--- Installing OpenShift Clients (oc and kubectl) v${OC_VERSION} ---" && \
-    curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" | \
-    # Extract the archive directly into /usr/local/bin.
-    # --strip-components=1 removes the top-level directory from the tarball,
-    # placing oc and kubectl directly into the target directory.
-    tar -xz -C /usr/local/bin --strip-components=1 && \
+    # --- 2. Install kubectl (Kubernetes CLI) ---
+    echo "--- Installing kubectl v${KUBECTL_VERSION} ---" && \
+    curl -L "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${TARGET_ARCH}/kubectl" -o /usr/local/bin/kubectl && \
+    chmod +x /usr/local/bin/kubectl && \
     \
-    # Step 3: Install KubeVirt Client (virtctl)
-    echo "--- Installing virtctl ${VIRTCTL_VERSION} ---" && \
-    curl -L -o /usr/local/bin/virtctl "https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64" && \
-    # Make the downloaded binary executable
-    chmod +x /usr/local/bin/virtctl && \
+    # --- 3. Install oc (OpenShift CLI) ---
+    # Downloads the tarball, extracts only the 'oc' binary directly into the PATH, and cleans up.
+    echo "--- Installing oc CLI v${OC_VERSION} ---" && \
+    curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" | tar -zx -C /usr/local/bin oc && \
+    chmod +x /usr/local/bin/oc && \
     \
-    # Step 4: Clean up the DNF cache to reduce final image size
-    echo "--- Cleaning up DNF cache ---" && \
-    dnf clean all
+    # --- 4. Install virtctl (KubeVirt CLI) ---
+    echo "--- Installing virtctl v${KUBEVIRT_VERSION} ---" && \
+    curl -L "https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/virtctl-${KUBEVIRT_VERSION}-linux-${TARGET_ARCH}" -o /usr/local/bin/virtctl && \
+    chmod +x /usr/local/bin/virtctl
 
-# --- Verification Step ---
-# Run version checks in a separate layer. This helps with Docker layer caching.
-# If you only change a tool's version ENV, only the installation layer and this one will be re-run.
+# ==============================================================================
+# VERIFICATION
+# The `kubectl --short` flag is deprecated and removed in modern versions.
+# We now use `kubectl version --client`.
+# ==============================================================================
 RUN echo "--- Verifying installed tool versions ---" && \
     oc version --client && \
-    kubectl version --client --short && \
+    kubectl version --client && \
     virtctl version --client && \
     jq --version
 
-# Set the default command to start a bash shell when the container is run interactively
-CMD ["/bin/bash"]
+# ==============================================================================
+# FINAL CONFIGURATION
+# Set the default command to run when a container is started from this image.
+# Here, we'll just drop into a bash shell.
+# ==============================================================================
+CMD [ "/bin/bash" ]
