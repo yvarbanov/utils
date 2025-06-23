@@ -13,7 +13,7 @@ RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/relea
     chmod +x /usr/local/bin/virtctl
 
 RUN oc version --client && \
-    kubectl version -c && \
+    kubectl version --client && \
     virtctl version -c && \
     jq --version
 
