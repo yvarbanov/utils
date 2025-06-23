@@ -1,22 +1,14 @@
-FROM alpine:3.20
+FROM fedora:40
 
-# Install necessary tools
-RUN apk add --no-cache curl ca-certificates tar
+RUN dnf install -y curl tar ca-certificates && dnf clean all
 
-# Set versions
-ENV OC_VERSION=4.15.0 \
-    VIRTCTL_VERSION=4.15.0
+RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.15.0/openshift-client-linux-4.15.0.tar.gz | \
+    tar -xz -C /usr/local/bin oc && \
+    chmod +x /usr/local/bin/oc
 
-# Download and install `oc`
-RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz | \
-    tar -xz -C /tmp && \
-    mv /tmp/oc /usr/bin/oc && chmod +x /usr/bin/oc
+RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/v1.4.1/virtctl-v1.4.1-linux-amd64 && \
+    chmod +x /usr/local/bin/virtctl
 
-# Download and install `virtctl`
-RUN curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/v${VIRTCTL_VERSION}/virtctl-v${VIRTCTL_VERSION}-linux-amd64 \
- && chmod +x /usr/local/bin/virtctl
-
-# Verify installations
 RUN oc version --client && virtctl --help
 
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/bin/bash"]
