@@ -1,5 +1,9 @@
 FROM fedora:40
 
+LABEL maintainer="@yvarbanov" \
+      description="A development and management image with oc, kubectl, virtctl, and jq." \
+      version="1.0"
+
 ENV OC_VERSION=4.16.0 \
     VIRTCTL_VERSION=v1.4.1
     
