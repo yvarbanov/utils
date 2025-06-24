@@ -5,7 +5,7 @@ LABEL maintainer="@yvarbanov" \
       version="1.0"
 
 ENV OC_VERSION=4.16.0 \
-    VIRTCTL_VERSION=v1.2.2
+    VIRTCTL_VERSION=v1.4.1
     
 RUN dnf install -y curl tar gzip jq ca-certificates && dnf clean all
 
