@@ -1,0 +1,33 @@
+FROM registry.access.redhat.com/ubi9/python-311
+
+LABEL maintainer="yvarbev@redhat.com, gh:@yvarbanov " \
+      description="Python runtime for running utilities" \
+      version="1.0"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir \
+      httplib2 \
+      numpy \
+      packaging \
+      pandas \
+      pip-review \
+      "psycopg[binary]" \
+      psycopg-pool \
+      pyparsing \
+      python-dateutil \
+      pytz \
+      six \
+      tabulate \
+      typing_extensions \
+      tzdata
+
+RUN python3 - <<'PY'
+import psycopg, numpy, pandas, httplib2, tabulate
+print("All imports OK")
+PY
+
+CMD ["python3"]
